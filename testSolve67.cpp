@@ -1,14 +1,15 @@
 #include <time.h>
 #include <iostream>
-#include <mpich/mpi.h>
 #include <fstream>
 
 #include "gf2misc.h"
 #include "mqmisc.h"
 
+#include "mpi.h"
+
 #define SEARCH_SPACE 57
 
-FILE *fr = fopen("challenge-1-74-0-resident", "rb");
+FILE *fr = fopen("mq-resident4-67-1", "rb");
 poly fullpoly[M][N + 1];
 __int128 partialDerivative[M][N] = {0};
 

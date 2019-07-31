@@ -6,7 +6,6 @@
 #include <bitset>
 #include <cstring>
 
-#include "mpi.h"
 #include "../ttmath-0.9.3/ttmath/ttmath.h"
 
 typedef ttmath::Int<1> int32;
@@ -38,76 +37,8 @@ void ffile2poly(FILE *fr, poly poly[][N + 1], int m);
 void addPoly(poly &dstPoly, poly &poly);
 void addTerm(poly &dstPoly, term &term);
 void loadPD(poly fullpoly[M][N + 1], int96 partialDerivative[M][N]);
-bool verifyPoly(uint32_t guess[N], poly spoly[M][N + 1]) {
-    for (int i = 0; i < M; i++) {
-        int8_t res = 0;
-        for (int j = 0; j < N; j++) {
-            if (guess[j]) {
-                for (int k = 0; k < spoly[i][j].length; k++) {
-                    int8_t r = 1;
-                    for (int l = j + 1; l < N; l++) {
-                        int word = l / 32;
-                        int bit = l % 32;
-                        if ((spoly[i][j].p[k].data[word] >> bit) & 1)
-                            r &= guess[l];
-                    }
-                    res ^= r;
-                }
-            }
-        }
-
-        if (spoly[i][N].length)
-            res ^= 1;
-        if (res)
-            return false;
-    }
-    return true;
-}
-void file2poly(FILE *fr, poly spoly[M][N + 1]) {
-    uint32_t temp;
-    term tterm;
-    for (int i = 0; i < M; i++) {
-        for (int j = 0; j < N + 1; j++) {
-            spoly[i][j].length = 0;
-            spoly[i][j].p = NULL;
-        }
-    }
-    for (int i = 0; i < M; i++) {
-        for (int j = 0; j < N; j++) {
-            for (int k = 0; k <= j; k++) {
-                fscanf(fr, "%u", &temp);
-                if (temp) {
-                    memset(tterm.data, 0, 12);
-                    int word = j / 32;
-                    int bit = j % 32;
-                    tterm.data[word] |= (1 << bit);
-                    word = k / 32;
-                    bit = k % 32;
-                    tterm.data[word] |= (1 << bit);
-                    addTerm(spoly[i][k], tterm);
-                }
-            }
-        }
-        for (int j = 0; j < N; j++) {
-            fscanf(fr, "%u", &temp);
-            if (temp) {
-                memset(tterm.data, 0, 12);
-                int word = j / 32;
-                int bit = j % 32;
-                tterm.data[word] |= (1 << bit);
-                addTerm(spoly[i][j], tterm);
-            }
-        }
-        fscanf(fr, "%u", &temp);
-        if (temp) {
-            memset(tterm.data, 0, 12);
-            int word = N / 32;
-            int bit = N % 32;
-            tterm.data[word] |= (1 << bit);
-            addTerm(spoly[i][N], tterm);
-        }
-    }
-}
+bool verifyPoly(uint32_t guess[N], poly spoly[M][N + 1]);
+void file2poly(FILE *fr, poly spoly[M][N + 1]);
 
 // gf2 arithmetic
 void checkConsist_19x10(uint32_t clist[11], uint32_t &mask);
@@ -116,8 +47,8 @@ const std::string currentDateTime();
 const int parityCheck(const int96 v);
 
 int main() {
-    FILE *fr = fopen("mq-resident4-64-1.txt", "rb");
-    FILE *frr = fopen("mq4-64-1-f.txt", "rb");
+    FILE *fr = fopen("mq-resident4-64-0.txt", "rb");
+    FILE *frr = fopen("mq4-64-0-f.txt", "rb");
     poly fullpoly[M][N + 1];
     int96 partialDerivative[EQUATION_NUM][N] = {0};
     ffile2poly(fr, fullpoly, EQUATION_NUM);
@@ -136,15 +67,11 @@ int main() {
 
     // MPI Init
     int rank, size;
-    MPI_Init(0, 0);
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
-
 
     // Key Boundary Init
-    int64 final_key = "18014398509481984";
-    int64 init_key = final_key * rank / 10000;
-    int64 end_key = final_key * (rank + 1) / 10000;
+    int64 result = "7752183025894934";
+    int64 init_key = "7752183025894934";
+    int64 final_key = "7752183025894940";
 
     // Equation Init
     if (init_key != 0)
@@ -209,11 +136,7 @@ int main() {
             for (int i = SEARCH_SPACE; i < SEARCH_SPACE + 10; i++)
                 guess[i] = sol[i - SEARCH_SPACE];
             if (verifyPoly(guess, verifypoly)) {
-                std::ofstream file;
-                std::string filename =
-                    "/home/export/base/suntnt/Vito/MQSolver_Sunway/solution" + currentDateTime()
-                        + ".txt";
-                file.open(filename.c_str());
+                std::ofstream file("solution.txt");
                 for (auto &g: guess)
                     file << g << std::endl;
                 file.close();
@@ -230,7 +153,6 @@ int main() {
         pre = ((int96) key ^ ((int96) key >> 1)) | ((int96) 0x7FF << SEARCH_SPACE);
     }
 
-    MPI_Finalize();
     return EXIT_SUCCESS;
 }
 
@@ -242,6 +164,31 @@ const std::string currentDateTime() {
     strftime(buf, sizeof(buf), "%Y-%m-%d.%X", &tstruct);
     return buf;
 }
+bool verifyPoly(uint32_t guess[N], poly spoly[M][N + 1]) {
+    for (int i = 0; i < M; i++) {
+        int8_t res = 0;
+        for (int j = 0; j < N; j++) {
+            if (guess[j]) {
+                for (int k = 0; k < spoly[i][j].length; k++) {
+                    int8_t r = 1;
+                    for (int l = j + 1; l < N; l++) {
+                        int word = l / 32;
+                        int bit = l % 32;
+                        if ((spoly[i][j].p[k].data[word] >> bit) & 1)
+                            r &= guess[l];
+                    }
+                    res ^= r;
+                }
+            }
+        }
+
+        if (spoly[i][N].length)
+            res ^= 1;
+        if (res)
+            return false;
+    }
+    return true;
+}
 void ffile2poly(FILE *fr, poly spoly[][N + 1], int m) {
     for (int i = 0; i < m; i++) {
         for (int j = 0; j < N + 1; j++) {
@@ -250,6 +197,51 @@ void ffile2poly(FILE *fr, poly spoly[][N + 1], int m) {
             for (int k = 0; k < spoly[i][j].length; k++)
                 for (int l = 0; l < 3; l++)
                     fscanf(fr, "%u", &(spoly[i][j].p[k].data[l]));
+        }
+    }
+}
+void file2poly(FILE *fr, poly spoly[M][N + 1]) {
+    uint32_t temp;
+    term tterm;
+    for (int i = 0; i < M; i++) {
+        for (int j = 0; j < N + 1; j++) {
+            spoly[i][j].length = 0;
+            spoly[i][j].p = NULL;
+        }
+    }
+    for (int i = 0; i < M; i++) {
+        for (int j = 0; j < N; j++) {
+            for (int k = 0; k <= j; k++) {
+                fscanf(fr, "%u", &temp);
+                if (temp) {
+                    memset(tterm.data, 0, 12);
+                    int word = j / 32;
+                    int bit = j % 32;
+                    tterm.data[word] |= (1 << bit);
+                    word = k / 32;
+                    bit = k % 32;
+                    tterm.data[word] |= (1 << bit);
+                    addTerm(spoly[i][k], tterm);
+                }
+            }
+        }
+        for (int j = 0; j < N; j++) {
+            fscanf(fr, "%u", &temp);
+            if (temp) {
+                memset(tterm.data, 0, 12);
+                int word = j / 32;
+                int bit = j % 32;
+                tterm.data[word] |= (1 << bit);
+                addTerm(spoly[i][j], tterm);
+            }
+        }
+        fscanf(fr, "%u", &temp);
+        if (temp) {
+            memset(tterm.data, 0, 12);
+            int word = N / 32;
+            int bit = N % 32;
+            tterm.data[word] |= (1 << bit);
+            addTerm(spoly[i][N], tterm);
         }
     }
 }

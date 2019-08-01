@@ -6,12 +6,6 @@
 #include <bitset>
 #include <cstring>
 
-#include "../ttmath-0.9.3/ttmath/ttmath.h"
-
-typedef ttmath::Int<1> int32;
-typedef ttmath::Int<2> int64;
-typedef ttmath::Int<3> int96;
-
 // structure to store one term
 struct term {
   uint32_t data[3];
@@ -24,33 +18,32 @@ struct poly {
   int length;
 };
 
-#define M 64
-#define N 64
+#define M 55
+#define N 55
 #define LEN 10001
-#define VARIABLE_NUM 10
+#define VARIABLE_NUM 9
 #define EQUATION_NUM 19
-#define SEARCH_SPACE 54
+#define SEARCH_SPACE 46
 
 // mq arithmetic
 void repeatPoly(poly &spoly);
 void ffile2poly(FILE *fr, poly poly[][N + 1], int m);
 void addPoly(poly &dstPoly, poly &poly);
 void addTerm(poly &dstPoly, term &term);
-void loadPD(poly fullpoly[M][N + 1], int96 partialDerivative[M][N]);
+void loadPD(poly fullpoly[M][N + 1], int64_ty partialDerivative[M][N]);
 bool verifyPoly(uint32_t guess[N], poly spoly[M][N + 1]);
 void file2poly(FILE *fr, poly spoly[M][N + 1]);
 
 // gf2 arithmetic
-void checkConsist_19x10(uint32_t clist[11], uint32_t &mask);
+void checkConsist_19x9(__m512i clist[10], uint32_t &mask);
 void extractSolution_19x10(const uint32_t clist[11], uint32_t sol[10]);
 const std::string currentDateTime();
-const int parityCheck(const int96 v);
 
 int main() {
     FILE *fr = fopen("mq-resident4-64-0.txt", "rb");
     FILE *frr = fopen("mq4-64-0-f.txt", "rb");
     poly fullpoly[M][N + 1];
-    int96 partialDerivative[EQUATION_NUM][N] = {0};
+    int64_t partialDerivative[EQUATION_NUM][N] = {0};
     ffile2poly(fr, fullpoly, EQUATION_NUM);
     loadPD(fullpoly, partialDerivative);
     fclose(fr);
@@ -59,23 +52,20 @@ int main() {
     ffile2poly(frr, verifypoly, M);
     fclose(frr);
 
-    int96 value[EQUATION_NUM] = {0};
-    int96 z;
-    int96 pre = ((int96) 0x7FF << SEARCH_SPACE);
+    int64_t value[EQUATION_NUM] = {0};
+    int64_t z;
+    int64_t pre = ((int64_t) 0x7FF << SEARCH_SPACE);
     int los = 0;
-    int96 guessMask = "18014398509481983";
+    int64_t guessMask = "18014398509481983";
 
     // MPI Init
     int rank, size;
 
     // Key Boundary Init
-    int64 result = "7752183025894934";
-    int64 init_key = "7752183000000000";
-    int64 final_key = "7752183025894940";
 
     // Equation Init
     if (init_key != 0)
-        pre = ((int96) 0x7FF << SEARCH_SPACE) | (((int96) (init_key - 1)) ^ (((int96) (init_key - 1)) >> 1));
+        pre = ((int64_t) 0x7FF << SEARCH_SPACE) | ((init_key - 1) ^ ((init_key - 1) >> 1));
     for (int i = 0; i < EQUATION_NUM; i++) {
         for (int j = 0; j < SEARCH_SPACE; j++) {
             if (((pre >> j) & 1) == 1) {
@@ -104,53 +94,8 @@ int main() {
         value[i] ^= ((int96) fullpoly[i][N].length << N);
     }
 
-    uint32_t matrix[EQUATION_NUM] = {0};
-    for (int64 key = init_key; key < final_key; key++) { // Exhaustive Search
-        // Step 1: set matrix
-        memset(matrix, 0, EQUATION_NUM * 4);
-        uint32_t clist[11] = {0};
-        for (int j = 0; j < EQUATION_NUM; j++) {
-            int32 c = value[j] >> N;
-            int32 v = value[j] >> 53;
-            uint32_t cuint, vuint;
-            c.ToUInt(cuint);
-            v.ToUInt(vuint);
-            matrix[j] = parityCheck(value[j] & guessMask) ^ cuint;
-            matrix[j] |= vuint & 0x7FE;
-        }
-        for (int i = 0; i < VARIABLE_NUM + 1; i++)
-            for (int j = 0; j < EQUATION_NUM; j++)
-                clist[i] |= ((matrix[j] >> (10 - i)) & 1) << j;
+    for (int64_t key = init_key; key < final_key; key++) { // Exhaustive Search
 
-        // Step 2: Gaussian Elimination
-        uint32_t mask = 0x7FFFF;
-        checkConsist_19x10(clist, mask);
-        if (!(mask & clist[10])) {
-            uint32_t sol[10] = {0};
-            extractSolution_19x10(clist, sol);
-            uint32_t guess[N] = {0};
-            for (int i = 0; i < SEARCH_SPACE; i++) {
-                int32 term = (pre >> i) & 1;
-                term.ToUInt(guess[i]);
-            }
-            for (int i = SEARCH_SPACE; i < SEARCH_SPACE + 10; i++)
-                guess[i] = sol[i - SEARCH_SPACE];
-            if (verifyPoly(guess, verifypoly)) {
-                std::ofstream file("solution.txt");
-                for (auto &g: guess)
-                    file << g << std::endl;
-                file.close();
-            }
-        }
-
-        // Step 3: Update Polynomial
-        z = (key >> 1) ^ key ^ pre;
-        ttmath::uint tableid, index;
-        z.FindLowestBit(tableid, index);
-        los = tableid * 32 + index;
-        for (int j = 0; j < EQUATION_NUM; j++)
-            value[j] ^= partialDerivative[j][los] & pre;
-        pre = ((int96) key ^ ((int96) key >> 1)) | ((int96) 0x7FF << SEARCH_SPACE);
     }
 
     return EXIT_SUCCESS;
@@ -245,7 +190,7 @@ void file2poly(FILE *fr, poly spoly[M][N + 1]) {
         }
     }
 }
-void loadPD(poly fullpoly[M][N + 1], int96 partialDerivative[M][N]) {
+void loadPD(poly fullpoly[M][N + 1], int64_t partialDerivative[M][N]) {
     for (int i = 0; i < EQUATION_NUM; i++) {
         for (int j = 0; j < N; j++) {
             for (int k = 0; k < fullpoly[i][j].length; k++) {
@@ -259,10 +204,10 @@ void loadPD(poly fullpoly[M][N + 1], int96 partialDerivative[M][N]) {
                     }
                 }
                 if (los > j) {
-                    partialDerivative[i][j] ^= (int96(1) << los);
-                    partialDerivative[i][los] ^= (int96(1) << j);
+                    partialDerivative[i][j] ^= (int64_t(1) << los);
+                    partialDerivative[i][los] ^= (int64_t(1) << j);
                 } else
-                    partialDerivative[i][j] ^= (int96(1) << N);
+                    partialDerivative[i][j] ^= (int64_t(1) << N);
             }
         }
     }
@@ -351,6 +296,7 @@ void repeatPoly(poly &spoly) {
     spoly.length = len;
 }
 void checkConsist_19x10(uint32_t clist[11], uint32_t &mask) {
+
     uint32_t _mask = 0x7FFFF;
     for (int i = 0; i < 10; i++) {
         uint32_t ci = clist[i] & mask;
@@ -369,15 +315,4 @@ void extractSolution_19x10(const uint32_t clist[11], uint32_t sol[10]) {
         uint32_t xp = (0x80000000 >> (__builtin_clz(clist[i])));
         sol[i] = (bool) (clist[10] & xp);
     }
-}
-const int parityCheck(const int96 v) {
-    uint32_t v2 = 0;
-    uint32_t v3 = 0;
-    uint32_t v4 = 0;
-    int96 hv1 = v >> 32;
-    int96 hv2 = v >> 64;
-    v.ToUInt(v4);
-    hv1.ToUInt(v3);
-    hv2.ToUInt(v2);
-    return __builtin_parity(v2) ^ __builtin_parity(v3) ^ __builtin_parity(v4);
 }

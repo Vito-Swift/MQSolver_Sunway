@@ -22,7 +22,6 @@ int main() {
     ffile2poly(fr, fullpoly, EQUATION_NUM);
     loadPD(fullpoly, partialDerivative);
 
-    __int128 value[EQUATION_NUM] = {0};
     int32_t matrix[EQUATION_NUM] = {0};
     int64_t z;
     int64_t pre = 0;

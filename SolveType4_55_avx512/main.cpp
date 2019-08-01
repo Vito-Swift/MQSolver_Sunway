@@ -3,145 +3,154 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <immintrin.h>
+#include <emmintrin.h>
 #include <bitset>
 #include <cstring>
-
-// structure to store one term
-struct term {
-    uint32_t data[3];
-};
-
-// structure to store a MQ polynomial
-struct poly {
-    // term array
-    term *p;
-    int length;
-};
 
 #define M 55
 #define N 55
 #define LEN 10001
 #define VARIABLE_NUM 9
 #define EQUATION_NUM 19
-#define SEARCH_SPACE 46
+#define SEARCH_SPACE 45
 
-// mq arithmetic
+struct term {
+  uint32_t data[3];
+};
+struct poly {
+  term *p;
+  int length;
+};
+
 void repeatPoly(poly &spoly);
-
 void ffile2poly(FILE *fr, poly poly[][N + 1], int m);
-
 void addPoly(poly &dstPoly, poly &poly);
-
 void addTerm(poly &dstPoly, term &term);
-
 void loadPD(poly fullpoly[M][N + 1], int64_t partialDerivative[M][N]);
-
 bool verifyPoly(uint32_t guess[N], poly spoly[M][N + 1]);
-
 void file2poly(FILE *fr, poly spoly[M][N + 1]);
 
-// gf2 arithmetic
-void checkConsist_19x9(uint32_t clist[10], uint32_t &mask);
-
-void extractSolution_19x9(const uint32_t clist[10], uint32_t sol[9]);
-
+void checkConsist_19x9(__m512i clist[11], __m512i &masks);
+void extractSolution_19x9(const uint32_t clist[11], uint32_t sol[9]);
 const std::string currentDateTime();
 
 int main() {
-    // MPI Init
-    FILE *fr = fopen("mq-resident4-55-0.txt", "rb");
-    FILE *frr = fopen("mq4-55-0-f.txt", "rb");
-    poly fullpoly[M][N + 1];
+    FILE *fr = fopen("mq-resident4-64-0.txt", "rb");
+    FILE *frr = fopen("mq4-64-0-f.txt", "rb");
     int64_t partialDerivative[EQUATION_NUM][N] = {0};
+    poly fullpoly[M][N + 1];
     ffile2poly(fr, fullpoly, EQUATION_NUM);
     loadPD(fullpoly, partialDerivative);
-    fclose(fr);
-
     poly verifypoly[M][N + 1];
     ffile2poly(frr, verifypoly, M);
+    fclose(fr);
     fclose(frr);
 
-    uint64_t value[EQUATION_NUM] = {0};
-    uint64_t z;
-    uint64_t pre = ((uint64_t) 0x3FF << SEARCH_SPACE);
+    int64_t value[16][EQUATION_NUM] = {0};
+    int64_t z;
+    int64_t pre[16] = {(int64_t(0x7FF) << SEARCH_SPACE)};
     int los = 0;
-    uint64_t guessMask = 0x3fffffffffff;
+    int64_t guessMask = 0x3fffffffffff;
 
-    uint64_t init_key = 0x1812fc4e0000;
-    uint64_t end_key = 0x1812fc4e4950;
-
-    // Equation Init
-    if (init_key != 0)
-        pre = ((uint64_t) 0x3FF << SEARCH_SPACE) | (((init_key - 1)) ^ (((init_key - 1)) >> 1));
-
-    for (int i = 0; i < EQUATION_NUM; i++) {
-        for (int j = 0; j < SEARCH_SPACE; j++) {
-            if (((pre >> j) & 1) == 1) {
-                for (int k = 0; k < fullpoly[i][j].length; k++) {
-                    int los = j;
-                    for (int ll = j + 1; ll < N; ll++) {
-                        if ((fullpoly[i][j].p[k].data[ll / 32] >> (ll % 32)) & 1) {
-                            los = ll;
-                            break;
+    int64_t keys[16];
+    int64_t init_key = 0;
+    int64_t final_key;
+    int64_t seg_size = (final_key - init_key) / 16;
+    for (int i = 0; i < 16; i++)
+        keys[i] = init_key + seg_size * i;
+    for (int i = 0; i < 16; i++) {
+        if (keys[i] != 0)
+            pre[i] = ((int64_t) (0x7FF) << SEARCH_SPACE)
+                | ((int64_t) (keys[i] - 1) ^ (int64_t) (keys[i] - 1) >> 1);
+        for (int j = 0; j < EQUATION_NUM; j++) {
+            for (int k = 0; k < SEARCH_SPACE; k++) {
+                if (((pre[i] >> k) & 1) == 1) {
+                    for (int l = 0; l < fullpoly[j][k].length; l++) {
+                        int los = k;
+                        for (int ll = k + 1; ll < N; ll++) {
+                            if ((fullpoly[j][k].p[l].data[ll / 32] >> (ll % 32)) & 1) {
+                                los = ll;
+                                break;
+                            }
                         }
+                        if (los == k)
+                            value[i][j] ^= ((int64_t) 1 << N);
+                        else if (los < SEARCH_SPACE)
+                            value[i][j] ^= (((pre[i] >> los) & 1) << N);
+                        else
+                            value[i][j] ^= (((pre[i] >> los) & 1) << los);
                     }
-                    if (los == j)
-                        value[i] ^= ((uint64_t) 1 << N);
-                    else if (los < SEARCH_SPACE)
-                        value[i] ^= (((pre >> los) & 1) << N);
-                    else
-                        value[i] ^= (((pre >> los) & 1) << los);
                 }
             }
-
+            for (int k = SEARCH_SPACE; k < N; k++)
+                if (fullpoly[j][k].length)
+                    value[i][j] ^= (int64_t) 1 << j;
+            value[i][j] ^= (int64_t) fullpoly[j][N].length << N;
         }
-        for (int j = SEARCH_SPACE; j < N; j++) {
-            if (fullpoly[i][j].length)
-                value[i] ^= ((uint64_t) 1 << j);
-        }
-        value[i] ^= ((uint64_t) fullpoly[i][N].length << N);
     }
 
-    uint32_t matrix[EQUATION_NUM] = {0};
-    for (int64_t key = init_key; key < end_key; key++) { // Exhaustive Search
-        // Step 1: set matrix
-        memset(matrix, 0, EQUATION_NUM * 4);
-        uint32_t clist[10] = {0};
-        for (int j = 0; j < EQUATION_NUM; j++) {
-            matrix[j] = __builtin_parityl(value[j] & guessMask) ^ (value[j] >> N);
-            matrix[j] |= (value[j] >> 45) & 0x3FE;
+    uint32_t matrix[16][EQUATION_NUM] = {0};
+    for (int64_t key = init_key; key < init_key + seg_size; key++) {
+        // set matrices
+        uint32_t clist[16][10] = {0};
+        for (int i = 0; i < 16; i++) {
+            memset(matrix[i], 0, EQUATION_NUM * 2);
+            for (int j = 0; j < EQUATION_NUM; j++) {
+                matrix[i][j] = __builtin_parityl(value[i][j] & guessMask) ^ (value[i][j] >> N);
+                matrix[i][j] |= (value[i][j] >> 45) & 0x3FE;
+            }
+            for (int j = 0; j < VARIABLE_NUM + 1; j++)
+                for (int k = 0; k < EQUATION_NUM; k++)
+                    clist[i][j] |= ((matrix[i][k] >> (9 - j)) & 1) << k;
         }
-        for (int i = 0; i < VARIABLE_NUM + 1; i++)
-            for (int j = 0; j < EQUATION_NUM; j++)
-                clist[i] |= ((matrix[j] >> (9 - i)) & 1) << j;
 
-        // Step 2: Gaussian Elimination
-        uint32_t mask = 0x7FFFF;
-        checkConsist_19x9(clist, mask);
-        if (!(mask & clist[9])) {
-            uint32_t sol[9] = {0};
-            extractSolution_19x9(clist, sol);
-            uint32_t guess[N] = {0};
-            for (int i = 0; i < SEARCH_SPACE; i++)
-                guess[i] = (pre >> i) & 1;
-            for (int i = 0; i < 9; i++)
-                guess[SEARCH_SPACE + i] = sol[VARIABLE_NUM - i - 1];
-            if (verifyPoly(guess, verifypoly)) {
-                std::ofstream file("solution.txt");
-                for (auto &g: guess)
-                    file << g << std::endl;
-                file.close();
+        // gaussian elimination
+        __m512i m512clist[10];
+        for (int j = 0; j < 10; j++) {
+            m512clist[j] = _mm512_set_epi32(clist[0][j],
+                                            clist[1][j],
+                                            clist[2][j],
+                                            clist[3][j],
+                                            clist[4][j],
+                                            clist[5][j],
+                                            clist[6][j],
+                                            clist[7][j],
+                                            clist[8][j],
+                                            clist[9][j],
+                                            clist[10][j],
+                                            clist[11][j],
+                                            clist[12][j],
+                                            clist[13][j],
+                                            clist[14][j],
+                                            clist[15][j]);
+        }
+        __m512i masks = _mm512_set1_epi32(0X3FFFF);
+        checkConsist_19x9(m512clist, masks);
+
+        // verify result
+        for (int i = 0; i < 16; i++) {
+            if (!(masks[i] & m512clist[9][i])) {
+                uint32_t sol[9] = {0};
+                uint32_t ci[10] = {0};
+                for (int j = 0; j < 10; j++)
+                    ci[j] = m512clist[i][j];
+                extractSolution_19x9(ci, sol);
+                uint32_t guess[N] = {0};
+                for (int j = 0; j < SEARCH_SPACE; j++)
+                    guess[j] = (uint32_t) (pre[i] >> j) & 1;
+                for (int j = 0; j < 9; j++)
+                    guess[SEARCH_SPACE + j] = sol[VARIABLE_NUM - j - 1];
+                if (verifyPoly(guess, verifypoly)) {
+                    std::ofstream file("solution.txt");
+                    for (auto &g: guess)
+                        file << g << std::endl;
+                    file.close();
+                }
             }
         }
-
-        // Step 3: Update Polynomial
-        z = ((uint64_t) key >> 1) ^ key ^ pre;
-        los = __builtin_ffsl(z) - 1;
-        for (int j = 0; j < EQUATION_NUM; j++)
-            value[j] ^= partialDerivative[j][los] & pre;
-        pre = (key ^ ((uint64_t) key >> 1)) | ((uint64_t) 0x3FF << SEARCH_SPACE);
     }
-    return EXIT_SUCCESS;
+
 }
 
 const std::string currentDateTime() {
@@ -152,7 +161,6 @@ const std::string currentDateTime() {
     strftime(buf, sizeof(buf), "%Y-%m-%d.%X", &tstruct);
     return buf;
 }
-
 bool verifyPoly(uint32_t guess[N], poly spoly[M][N + 1]) {
     for (int i = 0; i < M; i++) {
         int8_t res = 0;
@@ -178,7 +186,6 @@ bool verifyPoly(uint32_t guess[N], poly spoly[M][N + 1]) {
     }
     return true;
 }
-
 void ffile2poly(FILE *fr, poly spoly[][N + 1], int m) {
     for (int i = 0; i < m; i++) {
         for (int j = 0; j < N + 1; j++) {
@@ -190,7 +197,6 @@ void ffile2poly(FILE *fr, poly spoly[][N + 1], int m) {
         }
     }
 }
-
 void file2poly(FILE *fr, poly spoly[M][N + 1]) {
     uint32_t temp;
     term tterm;
@@ -236,8 +242,7 @@ void file2poly(FILE *fr, poly spoly[M][N + 1]) {
         }
     }
 }
-
-void loadPD(poly fullpoly[M][N + 1], int64_t partialDerivative[M][N]) {
+void loadPD(poly fullpoly[M][N + 1], __int128 partialDerivative[M][N]) {
     for (int i = 0; i < EQUATION_NUM; i++) {
         for (int j = 0; j < N; j++) {
             for (int k = 0; k < fullpoly[i][j].length; k++) {
@@ -251,15 +256,14 @@ void loadPD(poly fullpoly[M][N + 1], int64_t partialDerivative[M][N]) {
                     }
                 }
                 if (los > j) {
-                    partialDerivative[i][j] ^= (int64_t(1) << los);
-                    partialDerivative[i][los] ^= (int64_t(1) << j);
+                    partialDerivative[i][j] ^= (__int128(1) << los);
+                    partialDerivative[i][los] ^= (__int128(1) << j);
                 } else
-                    partialDerivative[i][j] ^= (int64_t(1) << N);
+                    partialDerivative[i][j] ^= (__int128(1) << N);
             }
         }
     }
 }
-
 void addPoly(poly &poly1, poly &poly2) {
     if (poly2.length > 0) {
         int len = poly1.length + poly2.length;
@@ -274,7 +278,6 @@ void addPoly(poly &poly1, poly &poly2) {
         poly1.length = len;
     }
 }
-
 void addTerm(poly &poly1, term &term1) {
     int len = poly1.length + 1;
     if ((poly1.p = (term *) realloc(poly1.p, len * sizeof(term))) == NULL) {
@@ -285,7 +288,6 @@ void addTerm(poly &poly1, term &term1) {
         poly1.p[poly1.length].data[k] = term1.data[k];
     poly1.length = len;
 }
-
 void repeatPoly(poly &spoly) {
     int llen = 0;
     int len = 0;
@@ -345,25 +347,9 @@ void repeatPoly(poly &spoly) {
     }
     spoly.length = len;
 }
+void checkConsist_19x10(__m512i clist[11], __m512i &masks) {
+    for (int i = 0; i < 10; i++) {
+        __m512i ci = _mm512_and_epi32(clist[i], masks);
 
-void checkConsist_19x9(uint32_t clist[10], uint32_t &mask) {
-    uint32_t _mask = 0x7FFFF;
-    for (int i = 0; i < 9; i++) {
-        uint32_t ci = clist[i] & mask;
-        if (ci == 0) continue;
-        uint32_t x = __builtin_clz(ci);
-        uint32_t xp = (0x80000000 >> x);
-        uint32_t xormask = (clist[i] & _mask) ^xp;
-        for (int j = 0; j < 10; j++)
-            clist[j] = (clist[j] & xp) ? (clist[j] ^ xormask) : clist[j];
-        mask ^= xp;
-    }
-}
-
-void extractSolution_19x9(const uint32_t clist[10], uint32_t sol[9]) {
-    for (int i = 0; i < 9; i++) {
-        if (clist[i] == 0) continue;
-        uint32_t xp = (0x80000000 >> (__builtin_clz(clist[i])));
-        sol[i] = (bool) (clist[9] & xp);
     }
 }

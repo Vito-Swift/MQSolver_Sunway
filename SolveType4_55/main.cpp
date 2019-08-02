@@ -8,14 +8,14 @@
 
 // structure to store one term
 struct term {
-    uint32_t data[3];
+  uint32_t data[3];
 };
 
 // structure to store a MQ polynomial
 struct poly {
-    // term array
-    term *p;
-    int length;
+  // term array
+  term *p;
+  int length;
 };
 
 #define M 55
@@ -73,7 +73,7 @@ int main() {
     // Equation Init
     if (init_key != 0)
         pre = ((uint64_t) 0x3FF << SEARCH_SPACE) | (((init_key - 1)) ^ (((init_key - 1)) >> 1));
-
+    std::cout << pre << std::endl;
     for (int i = 0; i < EQUATION_NUM; i++) {
         for (int j = 0; j < SEARCH_SPACE; j++) {
             if (((pre >> j) & 1) == 1) {
@@ -101,7 +101,7 @@ int main() {
         }
         value[i] ^= ((uint64_t) fullpoly[i][N].length << N);
     }
-
+    std::cout << init_key << std::endl;
     uint32_t matrix[EQUATION_NUM] = {0};
     for (int64_t key = init_key; key < end_key; key++) { // Exhaustive Search
         // Step 1: set matrix
@@ -119,6 +119,9 @@ int main() {
         uint32_t mask = 0x7FFFF;
         checkConsist_19x9(clist, mask);
         if (!(mask & clist[9])) {
+            for (auto& c: clist)
+                std::cout << std::bitset<19> (c) << std::endl;
+            std::cout << std::endl;
             uint32_t sol[9] = {0};
             extractSolution_19x9(clist, sol);
             uint32_t guess[N] = {0};

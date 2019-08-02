@@ -49,8 +49,8 @@ const std::string currentDateTime();
 
 int main() {
     // MPI Init
-    FILE *fr = fopen("mq-resident4-55-0.txt", "rb");
-    FILE *frr = fopen("mq4-55-0-f.txt", "rb");
+    FILE *fr = fopen("mq-resident-55.txt", "rb");
+    FILE *frr = fopen("mq_random55", "rb");
     poly fullpoly[M][N + 1];
     int64_t partialDerivative[EQUATION_NUM][N] = {0};
     ffile2poly(fr, fullpoly, EQUATION_NUM);
@@ -58,7 +58,7 @@ int main() {
     fclose(fr);
 
     poly verifypoly[M][N + 1];
-    ffile2poly(frr, verifypoly, M);
+    file2poly(frr, verifypoly);
     fclose(frr);
 
     uint64_t value[EQUATION_NUM] = {0};
@@ -67,13 +67,14 @@ int main() {
     int los = 0;
     uint64_t guessMask = 0x3fffffffffff;
 
-    uint64_t init_key = 0x1812fc4e0000;
-    uint64_t end_key = 0x1812fc4e4950;
+//    uint64_t init_key = 0x1812fc4e0000;
+//    uint64_t end_key = 0x1812fc4e4950;
+    uint64_t init_key = 0x155555555700;
+    uint64_t end_key = 0x155555555801;
 
     // Equation Init
     if (init_key != 0)
         pre = ((uint64_t) 0x3FF << SEARCH_SPACE) | (((init_key - 1)) ^ (((init_key - 1)) >> 1));
-    std::cout << pre << std::endl;
     for (int i = 0; i < EQUATION_NUM; i++) {
         for (int j = 0; j < SEARCH_SPACE; j++) {
             if (((pre >> j) & 1) == 1) {
@@ -101,7 +102,6 @@ int main() {
         }
         value[i] ^= ((uint64_t) fullpoly[i][N].length << N);
     }
-    std::cout << init_key << std::endl;
     uint32_t matrix[EQUATION_NUM] = {0};
     for (int64_t key = init_key; key < end_key; key++) { // Exhaustive Search
         // Step 1: set matrix
@@ -114,14 +114,15 @@ int main() {
         for (int i = 0; i < VARIABLE_NUM + 1; i++)
             for (int j = 0; j < EQUATION_NUM; j++)
                 clist[i] |= ((matrix[j] >> (9 - i)) & 1) << j;
-
+        if (abs(key - 0x1555555557ff) < 1) {
+            for (auto& m: matrix)
+                std::cout << std::bitset<10> (m) << std::endl;
+        }
         // Step 2: Gaussian Elimination
         uint32_t mask = 0x7FFFF;
         checkConsist_19x9(clist, mask);
         if (!(mask & clist[9])) {
-            for (auto& c: clist)
-                std::cout << std::bitset<19> (c) << std::endl;
-            std::cout << std::endl;
+            std::cout << key << std::endl;
             uint32_t sol[9] = {0};
             extractSolution_19x9(clist, sol);
             uint32_t guess[N] = {0};

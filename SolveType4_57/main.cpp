@@ -20,12 +20,12 @@ struct poly {
   int length;
 };
 
-#define M 56
-#define N 56
+#define M 57
+#define N 57
 #define LEN 10001
 #define VARIABLE_NUM 9
-#define EQUATION_NUM 20
-#define SEARCH_SPACE 47
+#define EQUATION_NUM 21
+#define SEARCH_SPACE 48
 
 // mq arithmetic
 void repeatPoly(poly &spoly);
@@ -43,16 +43,21 @@ bool verifyPoly(uint32_t guess[N], poly spoly[M][N + 1]);
 void file2poly(FILE *fr, poly spoly[M][N + 1]);
 
 // gf2 arithmetic
-void checkConsist_20x9(uint32_t clist[10], uint32_t &mask);
+void checkConsist_21x9(uint32_t clist[10], uint32_t &mask);
 
-void extractSolution_20x9(const uint32_t clist[10], uint32_t sol[9]);
+void extractSolution_21x9(const uint32_t clist[10], uint32_t sol[9]);
 
 const std::string currentDateTime();
 
 int main() {
     // MPI Init
-    FILE *fr = fopen("mq-resident4-56-0.txt", "rb");
-    FILE *frr = fopen("mq4-56-0-f.txt", "rb");
+    int size, rank;
+    MPI_Init(0, 0);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+    FILE *fr = fopen("mq-resident4-57-2.txt", "rb");
+    FILE *frr = fopen("mq4-57-2-f.txt", "rb");
     poly fullpoly[M][N + 1];
     int64_t partialDerivative[EQUATION_NUM][N] = {0};
     ffile2poly(fr, fullpoly, EQUATION_NUM);
@@ -67,10 +72,12 @@ int main() {
     uint64_t z;
     uint64_t pre = ((uint64_t) 0x3FF << SEARCH_SPACE);
     int los = 0;
-    uint64_t guessMask = 0x7fffffffffff;
+    uint64_t guessMask = 0xffffffffffff;
 
-    uint64_t init_key = 0x155555555700;
-    uint64_t end_key = 0x155555555801;
+    uint64_t segSize = 0x68db8bac7;
+    uint64_t init_key = segSize * rank;
+    uint64_t end_key = segSize * (rank + 1);
+    uint64_t count = 0;
 
     // Equation Init
     if (init_key != 0)
@@ -109,18 +116,18 @@ int main() {
         uint32_t clist[10] = {0};
         for (int j = 0; j < EQUATION_NUM; j++) {
             matrix[j] = __builtin_parityl(value[j] & guessMask) ^ (value[j] >> N);
-            matrix[j] |= (value[j] >> 46) & 0x3FE;
+            matrix[j] |= (value[j] >> 47) & 0x3FE;
         }
         for (int i = 0; i < VARIABLE_NUM + 1; i++)
             for (int j = 0; j < EQUATION_NUM; j++)
                 clist[i] |= ((matrix[j] >> (9 - i)) & 1) << j;
 
         // Step 2: Gaussian Elimination
-        uint32_t mask = 0xFFFFF;
-        checkConsist_20x9(clist, mask);
+        uint32_t mask = 0x1FFFFF;
+        checkConsist_21x9(clist, mask);
         if (!(mask & clist[9])) {
             uint32_t sol[9] = {0};
-            extractSolution_20x9(clist, sol);
+            extractSolution_21x9(clist, sol);
             uint32_t guess[N] = {0};
             for (int i = 0; i < SEARCH_SPACE; i++)
                 guess[i] = (pre >> i) & 1;
@@ -128,8 +135,8 @@ int main() {
                 guess[SEARCH_SPACE + i] = sol[VARIABLE_NUM - i - 1];
             if (verifyPoly(guess, verifypoly)) {
                 std::ofstream file("solution.txt");
-                for (auto &g: guess)
-                    file << g << std::endl;
+                for (int i = 0; i < N; i++)
+                    file << guess[i] << std::endl;
                 file.close();
             }
         }
@@ -140,8 +147,11 @@ int main() {
         for (int j = 0; j < EQUATION_NUM; j++)
             value[j] ^= partialDerivative[j][los] & pre;
         pre = (key ^ ((uint64_t) key >> 1)) | ((uint64_t) 0x3FF << SEARCH_SPACE);
+        if (count % (1 << 25) == 0)
+            std::cout << "time: " << currentDateTime() << "\trank: " << rank << "\tdegree: " << key - init_key << std::endl;
     }
 
+    MPI_Finalize();
     return EXIT_SUCCESS;
 }
 
@@ -347,8 +357,8 @@ void repeatPoly(poly &spoly) {
     spoly.length = len;
 }
 
-void checkConsist_20x9(uint32_t clist[10], uint32_t &mask) {
-    uint32_t _mask = 0xFFFFF;
+void checkConsist_21x9(uint32_t clist[10], uint32_t &mask) {
+    uint32_t _mask = 0x1FFFFF;
     for (int i = 0; i < 9; i++) {
         uint32_t ci = clist[i] & mask;
         if (ci == 0) continue;
@@ -361,7 +371,7 @@ void checkConsist_20x9(uint32_t clist[10], uint32_t &mask) {
     }
 }
 
-void extractSolution_20x9(const uint32_t clist[10], uint32_t sol[9]) {
+void extractSolution_21x9(const uint32_t clist[10], uint32_t sol[9]) {
     for (int i = 0; i < 9; i++) {
         if (clist[i] == 0) continue;
         uint32_t xp = (0x80000000 >> (__builtin_clz(clist[i])));

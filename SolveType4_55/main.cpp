@@ -61,94 +61,89 @@ int main() {
     ffile2poly(frr, verifypoly, M);
     fclose(frr);
 
-    uint32_t guess[N] =
-        {1, 1, 0, 0, 0, 1, 0, 1, 0, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 1, 0, 0, 1, 0, 1, 0, 0, 0,
-         1, 0, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1, 1, 1, 0};
-    std::cout << verifyPoly(guess, verifypoly) << std::endl;
-//    uint64_t value[EQUATION_NUM] = {0};
-//    uint64_t z;
-//    uint64_t pre = ((uint64_t) 0x3FF << SEARCH_SPACE);
-//    int los = 0;
-//    uint64_t guessMask = 0x3fffffffffff;
-//
-////    uint64_t init_key = 0x1812fc4e0000;
-////    uint64_t end_key = 0x1812fc4e4950;
-//    uint64_t init_key = 0x155555555700;
-//    uint64_t end_key = 0x155555555801;
-//
-//    // Equation Init
-//    if (init_key != 0)
-//        pre = ((uint64_t) 0x3FF << SEARCH_SPACE) | (((init_key - 1)) ^ (((init_key - 1)) >> 1));
-//    for (int i = 0; i < EQUATION_NUM; i++) {
-//        for (int j = 0; j < SEARCH_SPACE; j++) {
-//            if (((pre >> j) & 1) == 1) {
-//                for (int k = 0; k < fullpoly[i][j].length; k++) {
-//                    int los = j;
-//                    for (int ll = j + 1; ll < N; ll++) {
-//                        if ((fullpoly[i][j].p[k].data[ll / 32] >> (ll % 32)) & 1) {
-//                            los = ll;
-//                            break;
-//                        }
-//                    }
-//                    if (los == j)
-//                        value[i] ^= ((uint64_t) 1 << N);
-//                    else if (los < SEARCH_SPACE)
-//                        value[i] ^= (((pre >> los) & 1) << N);
-//                    else
-//                        value[i] ^= (((pre >> los) & 1) << los);
-//                }
-//            }
-//
-//        }
-//        for (int j = SEARCH_SPACE; j < N; j++) {
-//            if (fullpoly[i][j].length)
-//                value[i] ^= ((uint64_t) 1 << j);
-//        }
-//        value[i] ^= ((uint64_t) fullpoly[i][N].length << N);
-//    }
-//    uint32_t matrix[EQUATION_NUM] = {0};
-//    for (int64_t key = init_key; key < end_key; key++) { // Exhaustive Search
-//        // Step 1: set matrix
-//        memset(matrix, 0, EQUATION_NUM * 4);
-//        uint32_t clist[10] = {0};
-//        for (int j = 0; j < EQUATION_NUM; j++) {
-//            matrix[j] = __builtin_parityl(value[j] & guessMask) ^ (value[j] >> N);
-//            matrix[j] |= (value[j] >> 45) & 0x3FE;
-//        }
-//        for (int i = 0; i < VARIABLE_NUM + 1; i++)
-//            for (int j = 0; j < EQUATION_NUM; j++)
-//                clist[i] |= ((matrix[j] >> (9 - i)) & 1) << j;
-//        if (abs(key - 0x1555555557ff) < 1) {
-//            for (auto& m: matrix)
-//                std::cout << std::bitset<10> (m) << std::endl;
-//        }
-//        // Step 2: Gaussian Elimination
-//        uint32_t mask = 0x7FFFF;
-//        checkConsist_19x9(clist, mask);
-//        if (!(mask & clist[9])) {
-//            std::cout << key << std::endl;
-//            uint32_t sol[9] = {0};
-//            extractSolution_19x9(clist, sol);
-//            uint32_t guess[N] = {0};
-//            for (int i = 0; i < SEARCH_SPACE; i++)
-//                guess[i] = (pre >> i) & 1;
-//            for (int i = 0; i < 9; i++)
-//                guess[SEARCH_SPACE + i] = sol[VARIABLE_NUM - i - 1];
-//            if (verifyPoly(guess, verifypoly)) {
-//                std::ofstream file("solution.txt");
-//                for (auto &g: guess)
-//                    file << g << std::endl;
-//                file.close();
-//            }
-//        }
-//
-//        // Step 3: Update Polynomial
-//        z = ((uint64_t) key >> 1) ^ key ^ pre;
-//        los = __builtin_ffsl(z) - 1;
-//        for (int j = 0; j < EQUATION_NUM; j++)
-//            value[j] ^= partialDerivative[j][los] & pre;
-//        pre = (key ^ ((uint64_t) key >> 1)) | ((uint64_t) 0x3FF << SEARCH_SPACE);
-//    }
+    uint64_t value[EQUATION_NUM] = {0};
+    uint64_t z;
+    uint64_t pre = ((uint64_t) 0x3FF << SEARCH_SPACE);
+    int los = 0;
+    uint64_t guessMask = 0x3fffffffffff;
+
+//    uint64_t init_key = 0x1812fc4e0000;
+//    uint64_t end_key = 0x1812fc4e4950;
+    uint64_t init_key = 0x0;
+    uint64_t end_key = 0x155555555801;
+
+    // Equation Init
+    if (init_key != 0)
+        pre = ((uint64_t) 0x3FF << SEARCH_SPACE) | (((init_key - 1)) ^ (((init_key - 1)) >> 1));
+    for (int i = 0; i < EQUATION_NUM; i++) {
+        for (int j = 0; j < SEARCH_SPACE; j++) {
+            if (((pre >> j) & 1) == 1) {
+                for (int k = 0; k < fullpoly[i][j].length; k++) {
+                    int los = j;
+                    for (int ll = j + 1; ll < N; ll++) {
+                        if ((fullpoly[i][j].p[k].data[ll / 32] >> (ll % 32)) & 1) {
+                            los = ll;
+                            break;
+                        }
+                    }
+                    if (los == j)
+                        value[i] ^= ((uint64_t) 1 << N);
+                    else if (los < SEARCH_SPACE)
+                        value[i] ^= (((pre >> los) & 1) << N);
+                    else
+                        value[i] ^= (((pre >> los) & 1) << los);
+                }
+            }
+
+        }
+        for (int j = SEARCH_SPACE; j < N; j++) {
+            if (fullpoly[i][j].length)
+                value[i] ^= ((uint64_t) 1 << j);
+        }
+        value[i] ^= ((uint64_t) fullpoly[i][N].length << N);
+    }
+    for (int j = 0; j < EQUATION_NUM; j++)
+        std::cout << (value[j] & guessMask) << std::endl;
+    uint32_t matrix[EQUATION_NUM] = {0};
+    for (int64_t key = init_key; key < end_key; key++) { // Exhaustive Search
+        // Step 1: set matrix
+        memset(matrix, 0, EQUATION_NUM * 4);
+        uint32_t clist[10] = {0};
+        for (int j = 0; j < EQUATION_NUM; j++) {
+            matrix[j] = __builtin_parityl(value[j] & guessMask) ^ (value[j] >> N);
+            matrix[j] |= (value[j] >> 45) & 0x3FE;
+        }
+        for (int i = 0; i < VARIABLE_NUM + 1; i++)
+            for (int j = 0; j < EQUATION_NUM; j++)
+                clist[i] |= ((matrix[j] >> (9 - i)) & 1) << j;
+
+
+        // Step 2: Gaussian Elimination
+        uint32_t mask = 0x7FFFF;
+        checkConsist_19x9(clist, mask);
+        if (!(mask & clist[9])) {
+            uint32_t sol[9] = {0};
+            extractSolution_19x9(clist, sol);
+            uint32_t guess[N] = {0};
+            for (int i = 0; i < SEARCH_SPACE; i++)
+                guess[i] = (pre >> i) & 1;
+            for (int i = 0; i < 9; i++)
+                guess[SEARCH_SPACE + i] = sol[VARIABLE_NUM - i - 1];
+            if (verifyPoly(guess, verifypoly)) {
+                std::ofstream file("solution.txt");
+                for (auto &g: guess)
+                    file << g << std::endl;
+                file.close();
+            }
+        }
+
+        // Step 3: Update Polynomial
+        z = ((uint64_t) key >> 1) ^ key ^ pre;
+        los = __builtin_ffsl(z) - 1;
+        for (int j = 0; j < EQUATION_NUM; j++)
+            value[j] ^= partialDerivative[j][los] & pre;
+        pre = (key ^ ((uint64_t) key >> 1)) | ((uint64_t) 0x3FF << SEARCH_SPACE);
+    }
     return EXIT_SUCCESS;
 }
 
@@ -168,11 +163,13 @@ bool verifyPoly(uint32_t guess[N], poly spoly[M][N + 1]) {
             if (guess[j]) {
                 for (int k = 0; k < spoly[i][j].length; k++) {
                     int8_t r = 1;
+                    bool find = false;
                     for (int l = j + 1; l < N; l++) {
                         int word = l / 32;
                         int bit = l % 32;
-                        if ((spoly[i][j].p[k].data[word] >> bit) & 1)
+                        if ((spoly[i][j].p[k].data[word] >> bit) & 1) {
                             r &= guess[l];
+                        }
                     }
                     res ^= r;
                 }
@@ -266,6 +263,8 @@ void loadPD(poly fullpoly[M][N + 1], int64_t partialDerivative[M][N]) {
             }
         }
     }
+    for (int i = 0; i < EQUATION_NUM; i++)
+        std::cout << std::bitset<64> (partialDerivative[i][1]) << std::endl;
 }
 
 void addPoly(poly &poly1, poly &poly2) {

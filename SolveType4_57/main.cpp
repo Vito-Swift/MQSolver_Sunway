@@ -298,7 +298,6 @@ void addTerm(poly &poly1, term &term1) {
 }
 
 void repeatPoly(poly &spoly) {
-    int llen = 0;
     int len = 0;
     poly Chain[LEN];
     for (int i = 0; i < LEN; i++) {

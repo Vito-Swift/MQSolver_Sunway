@@ -5,10 +5,6 @@
 #include <string>
 #include <cstring>
 #include <bitset>
-#include "../ttmath-0.9.3/ttmath/ttmath.h"
-
-typedef ttmath::Int<1> ttint64;
-typedef ttmath::Int<2> ttint128;
 
 struct term {
   uint32_t data[3];
@@ -40,8 +36,8 @@ int main() {
     // MPI Init
     int size, rank;
 
-    File *fr = fopen("mq-resident", "rb");
-    File *frr = fopen("mq-f", "rb");
+    FILE *fr = fopen("mq-resident", "rb");
+    FILE *frr = fopen("mq-f", "rb");
     poly fullpoly[M][N + 1];
     int64_t pdhi[EQUATION_NUM][N] = {0};
     int64_t pdlo[EQUATION_NUM][N] = {0};
